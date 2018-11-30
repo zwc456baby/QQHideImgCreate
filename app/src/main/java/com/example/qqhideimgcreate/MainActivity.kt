@@ -1,22 +1,25 @@
 package com.example.qqhideimgcreate
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.support.v7.app.AppCompatActivity
 import android.view.View
+import android.widget.ImageView
+import com.example.qqhideimgcreate.Utils.ImageUtil
 import com.example.qqhideimgcreate.Utils.Log
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
-import java.io.InputStream
+
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     var displayImgPath: String? = null
         set(value) {
-            val bitmap = checkImgPath(value)
+            val bitmap = checkImgPath(displaySelectIv, value)
             if (bitmap == null) {
                 Log.v("path error")
                 return
@@ -26,7 +29,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     var hideImgPath: String? = null
         set(value) {
-            val bitmap = checkImgPath(value)
+            val bitmap = checkImgPath(hideSelectIv, value)
             if (bitmap == null) {
                 Log.v("path error")
                 return
@@ -66,16 +69,25 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
     }
 
-    fun checkImgPath(path: String?): Bitmap? {
+    fun checkImgPath(imgView: ImageView, path: String?): Bitmap? {
         if (path.isNullOrEmpty()) return null
         if (!File(path).exists()) return null
-        val bitmap: Bitmap
         try {
-            bitmap = BitmapFactory.decodeFile(path)
+            return ImageUtil.getBitmap(path, imgView.maxHeight, imgView.maxHeight)
         } catch (e: Exception) {
             return null
         }
-        return bitmap
+
+//        旧的实现
+//        if (path.isNullOrEmpty()) return null
+//        if (!File(path).exists()) return null
+//        val bitmap: Bitmap
+//        try {
+//            bitmap = BitmapFactory.decodeFile(path)
+//        } catch (e: Exception) {
+//            return null
+//        }
+//        return bitmap
     }
 
     fun startSelectImg(type: Int) {
@@ -89,46 +101,71 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK) {
-            val uri: Uri? = data?.getData()
-            val options: BitmapFactory.Options = BitmapFactory.Options()
-            options.inJustDecodeBounds = false
-            try {
-                if (uri == null) {
-                    Log.v("uri is null")
-                    return
+            data?.data?.apply {
+                if (selectType == 0) {
+                    displayImgPath = getRealPathFromURI(this@MainActivity, this)
+                } else if (selectType == 1) {
+                    hideImgPath = getRealPathFromURI(this@MainActivity, this)
                 }
-                val inputStream: InputStream? = getContentResolver().openInputStream(uri)
-                if (inputStream == null) {
-                    Log.v("input stream is null")
-                    return
-                }
-                BitmapFactory.decodeStream(inputStream, null, options)
-                inputStream.close()
-                val height: Int = options.outHeight
-                val width: Int = options.outWidth
-                var sampleSize = 1
-                val max: Int = Math.max(height, width)
-                val MAX_SIZE = 769
-                if (max > MAX_SIZE) {
-                    val nw: Int = width / 2
-                    val nh: Int = height / 2
-                    while ((nw / sampleSize) > MAX_SIZE || (nh / sampleSize) > MAX_SIZE) {
-                        sampleSize *= 2
-                    }
-                }
-                options.inSampleSize = sampleSize
-                options.inJustDecodeBounds = false
-                val selectdBitmap =
-                    BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, options)
-                if (selectType == 0)
-                    displaySelectIv.setImageBitmap(selectdBitmap)
-                else if (selectType == 1)
-                    hideSelectIv.setImageBitmap(selectdBitmap)
-                else
-                    Log.v("not found select type :%d".format(selectType))
-            } catch (ioe: Exception) {
-                Log.e("select img error:%s".format(Log.get(ioe)))
             }
+
+//            旧的实现
+//            val uri: Uri? = data?.getData()
+//            val options: BitmapFactory.Options = BitmapFactory.Options()
+//            options.inJustDecodeBounds = false
+//            try {
+//                if (uri == null) {
+//                    Log.v("uri is null")
+//                    return
+//                }
+//                val inputStream: InputStream? = getContentResolver().openInputStream(uri)
+//                if (inputStream == null) {
+//                    Log.v("input stream is null")
+//                    return
+//                }
+//                BitmapFactory.decodeStream(inputStream, null, options)
+//                inputStream.close()
+//                val height: Int = options.outHeight
+//                val width: Int = options.outWidth
+//                var sampleSize = 1
+//                val max: Int = Math.max(height, width)
+//                val MAX_SIZE = 769
+//                if (max > MAX_SIZE) {
+//                    val nw: Int = width / 2
+//                    val nh: Int = height / 2
+//                    while ((nw / sampleSize) > MAX_SIZE || (nh / sampleSize) > MAX_SIZE) {
+//                        sampleSize *= 2
+//                    }
+//                }
+//                options.inSampleSize = sampleSize
+//                options.inJustDecodeBounds = false
+//                val selectdBitmap =
+//                    BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, options)
+//                if (selectType == 0)
+//                    displaySelectIv.setImageBitmap(selectdBitmap)
+//                else if (selectType == 1)
+//                    hideSelectIv.setImageBitmap(selectdBitmap)
+//                else
+//                    Log.v("not found select type :%d".format(selectType))
+//            } catch (ioe: Exception) {
+//                Log.e("select img error:%s".format(Log.get(ioe)))
+//            }
+        }
+    }
+
+    fun getRealPathFromURI(context: Context, contentUri: Uri): String? {
+        Log.v(contentUri)
+        val cursor = context.getContentResolver().query(contentUri, null, null, null, null)
+        if (cursor == null) {
+            cursor?.close()
+            return contentUri.path
+        } else {
+            cursor.moveToFirst()
+            val index = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA)
+            val realPath = cursor.getString(index)
+            cursor.close()
+            Log.v(realPath)
+            return realPath
         }
     }
 
