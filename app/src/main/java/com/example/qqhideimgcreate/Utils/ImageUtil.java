@@ -1,5 +1,6 @@
 package com.example.qqhideimgcreate.Utils;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -97,12 +98,7 @@ public class ImageUtil {
         final BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(path, options);
-
-        // 调用上面定义的方法计算inSampleSize值
         options.inSampleSize = Math.round(calculateInSampleSize(options, reqWidth, reqHeight));
-//        options.inJustDecodeBounds = true;
-//        // 调用上面定义的方法计算inSampleSize值
-//        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
 
         options.inJustDecodeBounds = false;
         return BitmapFactory.decodeFile(path, options);
@@ -115,6 +111,7 @@ public class ImageUtil {
         return getBitmap(path, imageSize.width, imageSize.height);
     }
 
+    @SuppressLint("DefaultLocale")
     public static Bitmap getBitmap(String path,
                                    Context context) {
 
@@ -128,27 +125,7 @@ public class ImageUtil {
     }
 
     public static Bitmap getBitmap(String path) {
-        return getBitmap(path, 1920, 1920);
-
-//        // 第一次解析将inJustDecodeBounds设置为true，来获取图片大小
-//        final BitmapFactory.Options options = new BitmapFactory.Options();
-//        options.inJustDecodeBounds = true;
-//        BitmapFactory.decodeFile(path, options);
-//
-//        ImageSize imageSize = new ImageSize();
-//        float heightSample = ArithUtil.div(1920, options.outHeight);
-//        float widthSample = ArithUtil.div(1920, options.outWidth);
-//        if (heightSample < 1 || widthSample < 1) {
-//            float sampleSize = heightSample > widthSample ? widthSample : heightSample;
-//            imageSize.width = Math.round(ArithUtil.mul(options.outWidth, sampleSize));
-//            imageSize.height = Math.round(ArithUtil.mul(options.outHeight, sampleSize));
-//        } else {
-//            imageSize.width = options.outWidth;
-//            imageSize.height = options.outHeight;
-//        }
-//        options.inSampleSize = calculateInSampleSize(options, imageSize.width, imageSize.height);
-//        options.inJustDecodeBounds = false;
-//        return BitmapFactory.decodeFile(path, options);
+        return BitmapFactory.decodeFile(path);
     }
 
     /**
@@ -198,7 +175,6 @@ public class ImageUtil {
 
     /**
      * 按照比例缩放 bitmap
-     *
      */
     public static Bitmap proportionScaleBitmap(Bitmap origin, int newWidth, int newHeight) {
         if (origin == null) {
@@ -246,9 +222,8 @@ public class ImageUtil {
 
     /**
      * 根据ImageView获得适当的压缩的宽和高
-     *
      */
-    public static ImageSize getImageViewWidth(View imageView) {
+    private static ImageSize getImageViewWidth(View imageView) {
         if (imageView == null) return null;
         ImageSize imageSize = new ImageSize();
         final DisplayMetrics displayMetrics = imageView.getContext()
@@ -296,7 +271,6 @@ public class ImageUtil {
 
     /**
      * 反射获得ImageView设置的最大宽度和高度
-     *
      */
     private static int getImageViewFieldValue(Object object, String fieldName) {
         int value = 0;

@@ -5,4 +5,6 @@
 
     <string name="display_img_select_text">选择正常情况下显示的图片:</string>
     <string name="hide_img_select_text">选择点开图片后显示的隐藏图片:</string>
+    <string name="save_text">保存</string>
+    <string name="display_text">合成</string>
 </resources>

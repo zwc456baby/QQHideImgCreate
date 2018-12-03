@@ -3,7 +3,13 @@ package com.example.qqhideimgcreate.Utils
 import android.graphics.Bitmap
 import android.graphics.Color
 
-class ImgMixUtil() {
+class ImgMixUtil private constructor() {
+
+    companion object {
+        val INSTANCE by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+            ImgMixUtil()
+        }
+    }
 
     fun CalculateHiddenImage(blackImage: Bitmap, whiteImage: Bitmap): Bitmap {
         val b_width = blackImage.width;
@@ -26,9 +32,7 @@ class ImgMixUtil() {
         val w_heightOffset = if (w_height == f_height) 0 else (f_height - w_height) / 2;
 
         for (x in 0 until f_width) {
-//        for (val x = 0; x < f_width; x++) {
             for (y in 0 until f_height) {
-//            for (int y = 0; y < f_height; y++) {
                 //上下左右交叉排列黑白像素
                 val blackPixel = (x + y) % 2 == 0
 
@@ -54,9 +58,13 @@ class ImgMixUtil() {
 
                 val origin: Int =
                     if (blackPixel) blackImage.getPixel(coor_x, coor_y) else whiteImage.getPixel(coor_x, coor_y)
-                val gray = origin.shr(16);
 
-                Log.v("gray:%d".format(gray))
+//                直接将原来的数值位移得到新的颜色值
+//                val gray = origin.shr(16);
+//                还原本来的代码进行位移
+                val gray = (Color.red(origin) * 19595 + Color.green(origin) * 38469 + Color.blue(origin) * 7472).shr(16)
+
+                Log.v("gray:%d , blackPixel:%s".format(gray, blackPixel))
                 //根据颜色计算像素灰度，设定透明度
                 var finalColor: Int
                 if (blackPixel) {

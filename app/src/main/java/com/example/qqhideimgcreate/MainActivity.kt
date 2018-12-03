@@ -1,23 +1,31 @@
 package com.example.qqhideimgcreate
 
-import android.content.Context
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
+import android.os.Environment
+import android.support.v4.graphics.BitmapCompat
+import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
+import com.example.qqhideimgcreate.Utils.FileUtil
 import com.example.qqhideimgcreate.Utils.ImageUtil
+import com.example.qqhideimgcreate.Utils.ImgMixUtil
 import com.example.qqhideimgcreate.Utils.Log
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.android.synthetic.main.dialog_show_img.*
+import kotlinx.android.synthetic.main.dialog_show_img.view.*
 import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
 
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
 
-    var displayImgPath: String? = null
+    private var displayImgPath: String? = null
         set(value) {
             val bitmap = checkImgPath(displaySelectIv, value)
             if (bitmap == null) {
@@ -27,7 +35,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             displaySelectIv.setImageBitmap(bitmap)
             field = value
         }
-    var hideImgPath: String? = null
+    private var hideImgPath: String? = null
         set(value) {
             val bitmap = checkImgPath(hideSelectIv, value)
             if (bitmap == null) {
@@ -38,7 +46,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             field = value
         }
 
-    var selectType = -1
+    /**
+     * 0 : displayImgPath
+     * 1 : hideImgPath
+     */
+    private var selectType = -1
+
+    private var saveBitmap: Bitmap? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,10 +60,11 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         setClickEvent()
     }
 
-    fun setClickEvent() {
+    private fun setClickEvent() {
         Log.v("set click event")
         displaySelectIv.setOnClickListener(this)
         hideSelectIv.setOnClickListener(this)
+        mixBtn.setOnClickListener(this)
     }
 
     override fun onClick(p0: View?) {
@@ -63,13 +78,28 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 Log.i("hide select img click")
                 startSelectImg(1)
             }
+            R.id.mixBtn -> mixImg(displayImgPath, hideImgPath)
+            R.id.saveBtn -> {
+                Log.i("save bitmap btn click")
+                saveBitmap?.run {
+                    saveToFile(this)
+                    saveBitmap = null
+                }
+                waitDialog?.run {
+                    this.dismiss()
+                    waitDialog = null
+                }
+                waitDialogView?.run {
+                    waitDialogView = null
+                }
+            }
             else -> {
                 Log.w("not fund view click action")
             }
         }
     }
 
-    fun checkImgPath(imgView: ImageView, path: String?): Bitmap? {
+    private fun checkImgPath(imgView: ImageView, path: String?): Bitmap? {
         if (path.isNullOrEmpty()) return null
         if (!File(path).exists()) return null
         try {
@@ -77,20 +107,9 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         } catch (e: Exception) {
             return null
         }
-
-//        旧的实现
-//        if (path.isNullOrEmpty()) return null
-//        if (!File(path).exists()) return null
-//        val bitmap: Bitmap
-//        try {
-//            bitmap = BitmapFactory.decodeFile(path)
-//        } catch (e: Exception) {
-//            return null
-//        }
-//        return bitmap
     }
 
-    fun startSelectImg(type: Int) {
+    private fun startSelectImg(type: Int) {
         selectType = type
         val intent = Intent()
         intent.setType("image/*")
@@ -98,79 +117,105 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         startActivityForResult(Intent.createChooser(intent, "Browser Image..."), REQUEST_SELECTIMG_CODE)
     }
 
+    private fun mixImg(displayImgPath: String?, hideImgPath: String?) {
+        if (displayImgPath.isNullOrEmpty() || hideImgPath.isNullOrEmpty()) {
+            Log.w("请选择两张图片")
+            return
+        }
+        showSaveDialog()
+
+        Thread({
+            val disImg: Bitmap = ImageUtil.getBitmap(displayImgPath, 640, 480)
+            val hideImg: Bitmap = ImageUtil.getBitmap(hideImgPath, 640, 480)
+            saveBitmap = ImgMixUtil.INSTANCE.CalculateHiddenImage(disImg, hideImg)
+            if (!disImg.isRecycled) disImg.recycle()
+            if (!hideImg.isRecycled) hideImg.recycle()
+            this@MainActivity.runOnUiThread {
+                waitDialogView?.apply {
+                    this.waitProgress.visibility = View.INVISIBLE
+                    this.showIv.visibility = View.VISIBLE
+                    if (null != saveBitmap) {
+                        this.showIv.setImageBitmap(saveBitmap)
+                    }
+                }
+            }
+        }).start()
+    }
+
+    private var waitDialog: AlertDialog? = null
+    private var waitDialogView: View? = null
+
+    @SuppressLint("InflateParams")
+    private fun showSaveDialog() {
+        waitDialogView = LayoutInflater.from(this).inflate(R.layout.dialog_show_img, null)
+        waitDialogView?.apply {
+            //        view.showIv.setImageBitmap(bitmap)
+            this.saveBtn.setOnClickListener(this@MainActivity)
+            Log.v("width:%d , height:%d".format(this.showIv.width, this.showIv.height))
+            waitDialog = AlertDialog.Builder(this@MainActivity).setView(this).create()
+        }
+
+        waitDialog?.show()
+    }
+
+    private fun saveToFile(bitmap: Bitmap) {
+        try {
+            val outputStream: FileOutputStream =
+                FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + File.separator + "save.png")
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            outputStream.flush()
+            outputStream.close()
+        } catch (e: Exception) {
+            Log.e("save to file error:%s", Log.get(e))
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK) {
             data?.data?.apply {
-                if (selectType == 0) {
-                    displayImgPath = getRealPathFromURI(this@MainActivity, this)
-                } else if (selectType == 1) {
-                    hideImgPath = getRealPathFromURI(this@MainActivity, this)
+                val inputStream: InputStream? = getContentResolver().openInputStream(this)
+                if (inputStream == null) {
+                    Log.e("input stream is null ,not select img")
+                    return
+                }
+                var type: String = "tmp"
+                when (selectType) {
+                    0 -> type = "displayImg"
+                    1 -> type = "hideImg"
+                }
+                val savaImgPath = getImgTmpFilePath(type)
+                val result = copyImgToPathFromStream(
+                    inputStream,
+                    savaImgPath
+                )
+                if (result) {
+                    if (selectType == 0) {
+                        displayImgPath = savaImgPath
+                    } else if (selectType == 1) {
+                        hideImgPath = savaImgPath
+                    } else {
+                        Log.w("not found select type:%d".format(selectType))
+                    }
                 }
             }
-
-//            旧的实现
-//            val uri: Uri? = data?.getData()
-//            val options: BitmapFactory.Options = BitmapFactory.Options()
-//            options.inJustDecodeBounds = false
-//            try {
-//                if (uri == null) {
-//                    Log.v("uri is null")
-//                    return
-//                }
-//                val inputStream: InputStream? = getContentResolver().openInputStream(uri)
-//                if (inputStream == null) {
-//                    Log.v("input stream is null")
-//                    return
-//                }
-//                BitmapFactory.decodeStream(inputStream, null, options)
-//                inputStream.close()
-//                val height: Int = options.outHeight
-//                val width: Int = options.outWidth
-//                var sampleSize = 1
-//                val max: Int = Math.max(height, width)
-//                val MAX_SIZE = 769
-//                if (max > MAX_SIZE) {
-//                    val nw: Int = width / 2
-//                    val nh: Int = height / 2
-//                    while ((nw / sampleSize) > MAX_SIZE || (nh / sampleSize) > MAX_SIZE) {
-//                        sampleSize *= 2
-//                    }
-//                }
-//                options.inSampleSize = sampleSize
-//                options.inJustDecodeBounds = false
-//                val selectdBitmap =
-//                    BitmapFactory.decodeStream(getContentResolver().openInputStream(uri), null, options)
-//                if (selectType == 0)
-//                    displaySelectIv.setImageBitmap(selectdBitmap)
-//                else if (selectType == 1)
-//                    hideSelectIv.setImageBitmap(selectdBitmap)
-//                else
-//                    Log.v("not found select type :%d".format(selectType))
-//            } catch (ioe: Exception) {
-//                Log.e("select img error:%s".format(Log.get(ioe)))
-//            }
         }
     }
 
-    fun getRealPathFromURI(context: Context, contentUri: Uri): String? {
-        Log.v(contentUri)
-        val cursor = context.getContentResolver().query(contentUri, null, null, null, null)
-        if (cursor == null) {
-            cursor?.close()
-            return contentUri.path
-        } else {
-            cursor.moveToFirst()
-            val index = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA)
-            val realPath = cursor.getString(index)
-            cursor.close()
-            Log.v(realPath)
-            return realPath
-        }
+    private fun copyImgToPathFromStream(input: InputStream, path: String): Boolean {
+        Log.v("copy img to path :%s".format(path))
+        return FileUtil.INSTANCE.copyToPathFromStream(input, path)
+    }
+
+    private fun getImgTmpFilePath(type: String): String {
+        val file = this@MainActivity.getExternalFilesDir(LOCAL_IMG_TYPE)
+        if (null == file) return Environment.getExternalStorageDirectory().absolutePath + File.separator + type + ".png"
+        return file.absolutePath + File.separator + type + ".png"
     }
 
     companion object {
         val REQUEST_SELECTIMG_CODE = 0
+        val LOCAL_IMG_TYPE = "image"
     }
 
 }
