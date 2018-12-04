@@ -173,7 +173,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         })
         currentMixThreadName = mixThead.name
         mixThead.start()
-        
+
     }
 
     private var waitDialog: AlertDialog? = null

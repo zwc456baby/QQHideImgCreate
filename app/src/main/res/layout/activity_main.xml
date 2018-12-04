@@ -27,6 +27,7 @@
                 app:layout_constraintTop_toBottomOf="@id/displayImgSelectTv"
                 app:layout_constraintBottom_toTopOf="@id/hideImgSelectTv"
                 android:id="@+id/displaySelectIv"
+                android:background="@color/colorBlack"
         />
         <TextView
                 android:layout_width="wrap_content"
@@ -48,6 +49,7 @@
                 app:layout_constraintTop_toBottomOf="@id/hideImgSelectTv"
                 app:layout_constraintBottom_toTopOf="@id/mixBtn"
                 android:id="@+id/hideSelectIv"
+                android:background="@color/colorBlack"
         />
 
         <Button
