@@ -1,11 +1,13 @@
 package com.example.qqhideimgcreate
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Environment
-import android.support.v4.graphics.BitmapCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
 import android.view.LayoutInflater
@@ -16,7 +18,6 @@ import com.example.qqhideimgcreate.Utils.ImageUtil
 import com.example.qqhideimgcreate.Utils.ImgMixUtil
 import com.example.qqhideimgcreate.Utils.Log
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.dialog_show_img.*
 import kotlinx.android.synthetic.main.dialog_show_img.view.*
 import java.io.File
 import java.io.FileOutputStream
@@ -54,10 +55,20 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private var saveBitmap: Bitmap? = null
 
+    private val progressReceive = ProgressBroaddReceive()
+
+    private var currentMixThreadName = ""
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         setClickEvent()
+        registerProgressReceive()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterProgressReceive()
     }
 
     private fun setClickEvent() {
@@ -65,6 +76,20 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         displaySelectIv.setOnClickListener(this)
         hideSelectIv.setOnClickListener(this)
         mixBtn.setOnClickListener(this)
+    }
+
+    private fun registerProgressReceive() {
+        val filter = IntentFilter()
+        filter.addAction(ImgMixUtil.RECEIVE_IMGMIX_PROGRESS)
+        registerReceiver(progressReceive, filter)
+    }
+
+    private fun unregisterProgressReceive() {
+        try {
+            unregisterReceiver(progressReceive)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onClick(p0: View?) {
@@ -124,22 +149,31 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         }
         showSaveDialog()
 
-        Thread({
+
+        val mixThead = Thread({
+            val name = String(currentMixThreadName.toByteArray())  // 重新标记线程名称和对象
             val disImg: Bitmap = ImageUtil.getBitmap(displayImgPath, 640, 480)
             val hideImg: Bitmap = ImageUtil.getBitmap(hideImgPath, 640, 480)
-            saveBitmap = ImgMixUtil.INSTANCE.CalculateHiddenImage(disImg, hideImg)
+            saveBitmap = ImgMixUtil.INSTANCE.CalculateHiddenImage(this@MainActivity, disImg, hideImg)
             if (!disImg.isRecycled) disImg.recycle()
             if (!hideImg.isRecycled) hideImg.recycle()
+
+            if (!name.equals(currentMixThreadName))
+                return@Thread
             this@MainActivity.runOnUiThread {
                 waitDialogView?.apply {
                     this.waitProgress.visibility = View.INVISIBLE
+                    this.mixProgressTv.visibility = View.INVISIBLE
                     this.showIv.visibility = View.VISIBLE
                     if (null != saveBitmap) {
                         this.showIv.setImageBitmap(saveBitmap)
                     }
                 }
             }
-        }).start()
+        })
+        currentMixThreadName = mixThead.name
+        mixThead.start()
+        
     }
 
     private var waitDialog: AlertDialog? = null
@@ -218,4 +252,12 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         val LOCAL_IMG_TYPE = "image"
     }
 
+    inner class ProgressBroaddReceive : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val progress = intent?.getIntExtra(ImgMixUtil.GET_PROGRESS_KEY, 0)
+            if (null != waitDialog && null != waitDialogView && waitDialogView!!.visibility == View.VISIBLE && waitDialog!!.isShowing) {
+                waitDialogView?.mixProgressTv?.setText("当前进度:%d".format(progress))
+            }
+        }
+    }
 }
