@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.support.v7.app.AlertDialog
@@ -194,11 +195,18 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun saveToFile(bitmap: Bitmap) {
         try {
+            val pngPath =
+                Environment.getExternalStorageDirectory().absolutePath + File.separator + "DCIM" + File.separator + "save.png"
             val outputStream: FileOutputStream =
-                FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + File.separator + "save.png")
+                FileOutputStream(pngPath)
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
             outputStream.flush()
             outputStream.close()
+            //发广播
+            val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+            val uri = Uri.fromFile(File(pngPath))
+            intent.data = uri
+            sendBroadcast(intent)
         } catch (e: Exception) {
             Log.e("save to file error:%s", Log.get(e))
         }
